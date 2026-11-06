@@ -35,6 +35,18 @@ describe('FolderManager', () => {
     expect(c!.find('[data-test="delete"]').exists()).toBe(true)
   })
 
+  it('drag and drop reorders; dragstart sets dataTransfer data so Firefox starts the drag', async () => {
+    const f = mockFetch({ 'PUT /folders/g1/order': () => json(null, 204) })
+    const w = await mountIt()
+    const dt = { effectAllowed: 'uninitialized', data: {} as Record<string, string>, setData(t: string, v: string) { this.data[t] = v } }
+    await w.get('[data-test="reorder-item"][data-id="a"]').trigger('dragstart', { dataTransfer: dt })
+    expect(dt.data['text/plain']).toBe('a')
+    expect(dt.effectAllowed).toBe('move')
+    await w.get('[data-test="reorder-item"][data-id="c"]').trigger('drop')
+    await flushPromises()
+    expect(bodyOf(f, 'PUT /folders/g1/order')).toEqual({ submission_ids: ['b', 'c', 'a'] })
+  })
+
   it('reorder sends full id list', async () => {
     const f = mockFetch({ 'PUT /folders/g1/order': () => json(null, 204) })
     const w = await mountIt()

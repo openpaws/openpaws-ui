@@ -81,6 +81,14 @@ async function moveTo(from: number, to: number) {
     }
   })
 }
+/** Firefox only starts a drag when dataTransfer carries data. */
+function onDragStart(e: DragEvent, i: number, id: string) {
+  dragFrom.value = i
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
+}
 function onDrop(to: number) {
   const from = dragFrom.value
   dragFrom.value = null
@@ -155,7 +163,7 @@ function onDrop(to: number) {
         data-test="reorder-item"
         :data-id="s.id"
         draggable="true"
-        @dragstart="dragFrom = i"
+        @dragstart="onDragStart($event, i, s.id)"
         @dragover.prevent
         @drop.prevent="onDrop(i)"
         @dragend="dragFrom = null"
