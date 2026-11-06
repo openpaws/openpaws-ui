@@ -55,8 +55,36 @@ const CONCURRENCY = 3
 export type UploadState = 'idle' | 'uploading' | 'completing' | 'done' | 'error'
 
 /** Client-side check before any request: null when OK, else the message to show. */
+/**
+ * Browsers often report an empty `File.type` (e.g. .odt/.docx on Windows, some .flac/.m4a/.mov).
+ * The API checks the declared mime against its allow-list and then sniffs the real bytes, so
+ * declaring one inferred from the extension is safe.
+ */
+const EXT_MIMES: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
+  mp3: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', oga: 'audio/ogg', m4a: 'audio/mp4',
+  mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+  txt: 'text/plain',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  odt: 'application/vnd.oasis.opendocument.text',
+  pdf: 'application/pdf',
+}
+
+const extOf = (name: string) => /\.([^.]+)$/.exec(name)?.[1]?.toLowerCase() ?? ''
+
+/** The mime to declare: the browser's when it gave one, else inferred from the extension ('' if unknown). */
+export function resolveMime(file: File): string {
+  return file.type || EXT_MIMES[extOf(file.name)] || ''
+}
+
+/** `accept` attribute for a kind: its mimes plus the matching extensions. */
+export function acceptFor(kind: UploadKind): string {
+  const exts = Object.entries(EXT_MIMES).filter(([, m]) => UPLOAD_MIMES[kind].includes(m)).map(([e]) => `.${e}`)
+  return [...UPLOAD_MIMES[kind], ...exts].join(',')
+}
+
 export function checkUploadFile(file: File, kind: UploadKind): string | null {
-  if (!UPLOAD_MIMES[kind].includes(file.type)) return 'This file type is not supported here.'
+  if (!UPLOAD_MIMES[kind].includes(resolveMime(file))) return 'This file type is not supported here.'
   if (file.size > UPLOAD_LIMITS[kind]) {
     return `This file is too large. ${KIND_LABEL[kind]} can be up to ${Math.round(UPLOAD_LIMITS[kind] / MB)} MB.`
   }
@@ -142,6 +170,7 @@ export function useUploader(opts: UploaderOptions = {}) {
       }
       xhr.onabort = () => {
         settle()
+        loaded.set(part, 0)
         reject(new UploadError(CANCELLED_MESSAGE, false))
       }
       xhr.send(body)
@@ -202,7 +231,7 @@ export function useUploader(opts: UploaderOptions = {}) {
   }
 
   async function runSingle(myRun: number, s: UploadSession) {
-    await put(s.url!, file!, 1, file!.type)
+    await put(s.url!, file!, 1, resolveMime(file!))
     assertCurrent(myRun)
     state.value = 'completing'
     await api(`/uploads/${s.id}/complete`, { method: 'POST' })
@@ -220,7 +249,7 @@ export function useUploader(opts: UploaderOptions = {}) {
         loaded.clear()
         progress.value = 0
         const res = await api<{ data: UploadSession }>('/uploads', {
-          method: 'POST', body: { kind, filename: file!.name, mime: file!.type, size: file!.size },
+          method: 'POST', body: { kind, filename: file!.name, mime: resolveMime(file!), size: file!.size },
         })
         assertCurrent(myRun)
         session = res.data

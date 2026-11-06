@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { watch } from 'vue'
-import { useUploader, checkUploadFile, MULTIPART_ETAG_MESSAGE } from '~/composables/useUploader'
+import { useUploader, checkUploadFile, resolveMime, acceptFor, MULTIPART_ETAG_MESSAGE } from '~/composables/useUploader'
 import { bodyOf, json, mockFetch } from '../helpers/mockFetch'
 import { fakeSizedFile, installFakeXhr, type FakeXHR } from '../helpers/fakeXhr'
 
@@ -135,5 +135,56 @@ describe('useUploader', () => {
     const up = useUploader()
     await expect(up.upload(new File(['x'], 'a.png', { type: 'image/png' }), 'image')).rejects.toThrow()
     expect(up.error.value).toBe('Daily upload limit reached.')
+  })
+
+  it('infers the mime from the extension when the browser reports none', async () => {
+    const f = mockFetch({
+      'POST /uploads': () => single({ kind: 'audio' }),
+      'POST /uploads/u1/complete': () => json({ id: 'u1', status: 'uploaded' }),
+    })
+    const X = installFakeXhr()
+    const flac = new File(['fLaC'], 'Song.FLAC', { type: '' })
+    expect(resolveMime(flac)).toBe('audio/flac')
+    expect(checkUploadFile(flac, 'audio')).toBeNull()
+    expect(resolveMime(new File(['x'], 'a.odt'))).toBe('application/vnd.oasis.opendocument.text')
+    expect(resolveMime(new File(['x'], 'a.png', { type: 'image/png' }))).toBe('image/png')
+    const up = useUploader()
+    await up.upload(flac, 'audio')
+    expect(bodyOf(f, 'POST /uploads')).toEqual({ kind: 'audio', filename: 'Song.FLAC', mime: 'audio/flac', size: 4 })
+    expect(X.instances[0]!.requestHeaders['Content-Type']).toBe('audio/flac')
+  })
+
+  it('an empty-type .exe is still refused', () => {
+    expect(resolveMime(new File(['x'], 'a.exe'))).toBe('')
+    expect(checkUploadFile(new File(['x'], 'a.exe'), 'document')).toBe('This file type is not supported here.')
+    expect(checkUploadFile(new File(['x'], 'noext'), 'audio')).toBe('This file type is not supported here.')
+  })
+
+  it('accept lists mimes plus extensions so pickers do not grey files out', () => {
+    expect(acceptFor('audio').split(',')).toEqual(expect.arrayContaining(['audio/flac', '.flac', '.m4a', '.mp3']))
+    expect(acceptFor('document').split(',')).toEqual(expect.arrayContaining(['.odt', '.docx', '.pdf', '.txt']))
+    expect(acceptFor('avatar').split(',')).not.toContain('.mp3')
+  })
+
+  it('aborted parts drop their progress so resume does not over-count', async () => {
+    mockFetch({
+      'POST /uploads': () => json({ data: { id: 'm1', kind: 'video', status: 'pending', multipart: true, part_size: 6, part_count: 2, expires_at: 'x' } }, 201),
+      'POST /uploads/m1/parts': partUrls,
+      'POST /uploads/m1/complete': () => json({ id: 'm1', status: 'uploaded' }),
+    })
+    const X = installFakeXhr(() => null)
+    const up = useUploader({ delay: async () => {} })
+    const p = up.upload(new File(['abcdefghijkl'], 'v.mp4', { type: 'video/mp4' }), 'video').catch(() => {})
+    await vi.waitFor(() => expect(X.instances).toHaveLength(2))
+    X.instances[0]!.upload.onprogress?.({ loaded: 5, total: 6, lengthComputable: true })
+    X.instances[1]!.upload.onprogress?.({ loaded: 5, total: 6, lengthComputable: true })
+    up.abort()
+    await p
+    X.handler = x => ({ status: 200, headers: { ETag: `"e${partNo(x)}"` }, progress: [3] })
+    const seen: number[] = []
+    watch(up.progress, v => seen.push(v), { flush: 'sync' })
+    await up.resume()
+    expect(Math.max(...seen)).toBeLessThanOrEqual(1)
+    expect(seen[0]).toBe(0.25) // 3 of 12 bytes, not 5+5+3
   })
 })

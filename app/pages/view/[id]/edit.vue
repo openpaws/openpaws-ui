@@ -75,7 +75,7 @@ function onDelete() {
   return del.run(async () => {
     await api(`/submissions/${encodeURIComponent(id)}`, { method: 'DELETE' })
     toasts.push('Submission deleted.')
-    await navigateTo(`/user/${auth.me!.username}/gallery`)
+    await navigateTo(`/user/${encodeURIComponent(auth.me!.username)}/gallery`)
   })
 }
 </script>

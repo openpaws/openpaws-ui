@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Me } from '~/types/api'
 import { pollUntil } from '~/utils/pollUntil'
-import { UPLOAD_MIMES } from '~/composables/useUploader'
+import { acceptFor } from '~/composables/useUploader'
 import { ApiError } from '~/utils/apiError'
 
 const props = withDefaults(defineProps<{ kind: 'avatar' | 'banner', interval?: number, timeout?: number }>(), { interval: 2000, timeout: 30000 })
@@ -63,7 +63,7 @@ async function onChange(e: Event) {
     <p v-else class="hint">
       No {{ kind }} yet.
     </p>
-    <input :id="`pi-${uid}`" type="file" :name="kind" :accept="UPLOAD_MIMES[kind].join(',')" :disabled="busy" @change="onChange">
+    <input :id="`pi-${uid}`" type="file" :name="kind" :accept="acceptFor(kind)" :disabled="busy" @change="onChange">
     <div v-if="uploader.state.value === 'uploading' || uploader.state.value === 'completing'" class="row">
       <progress :value="uploader.progress.value" max="1" :aria-label="`${label} upload progress`" />
       <span role="status">{{ Math.round(uploader.progress.value * 100) }}%</span>

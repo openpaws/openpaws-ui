@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { UploadKind } from '~/types/api'
-import { UPLOAD_MIMES, type UploadView } from '~/composables/useUploader'
+import { acceptFor, type UploadView } from '~/composables/useUploader'
 
 const props = defineProps<{ name: string, label: string, kind: UploadKind, view: UploadView, hint?: string }>()
 const emit = defineEmits<{ pick: [file: File | null], resume: [] }>()
 const uid = useId()
-const accept = computed(() => UPLOAD_MIMES[props.kind].join(','))
+const accept = computed(() => acceptFor(props.kind))
 
 function onChange(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0] ?? null
@@ -29,9 +29,9 @@ function onChange(e: Event) {
         Uploaded {{ view.name }}
       </p>
       <div v-else-if="view.state === 'error'" class="row" role="alert">
-        <span class="field__error">{{ view.error }}</span>
+        <span class="field__error">Upload failed — {{ view.error }}</span>
         <button v-if="view.name" type="button" data-test="resume" @click="emit('resume')">
-          Try again
+          Retry
         </button>
       </div>
     </template>
