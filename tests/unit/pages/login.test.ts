@@ -7,8 +7,9 @@ import Register from '~/pages/register.vue'
 import VerifyEmail from '~/pages/verify-email.vue'
 import { json, ME, mockFetch } from '../../helpers/mockFetch'
 
-const { navigateToMock } = vi.hoisted(() => ({ navigateToMock: vi.fn() }))
+const { navigateToMock, reloadMock } = vi.hoisted(() => ({ navigateToMock: vi.fn(), reloadMock: vi.fn() }))
 mockNuxtImport('navigateTo', () => navigateToMock)
+mockNuxtImport('reloadNuxtApp', () => reloadMock)
 
 async function fillLogin(w: Awaited<ReturnType<typeof mountSuspended>>) {
   await w.get('input[autocomplete="username"]').setValue('kit')
@@ -20,6 +21,7 @@ async function fillLogin(w: Awaited<ReturnType<typeof mountSuspended>>) {
 describe('login page', () => {
   beforeEach(() => {
     navigateToMock.mockReset()
+    reloadMock.mockReset()
     useAuthStore().me = null
   })
   const okRoutes = () => ({
@@ -27,19 +29,20 @@ describe('login page', () => {
     'GET /me': () => json({ data: ME }),
   })
 
-  it('login success stores me and redirects to next', async () => {
+  it('login success stores me and fully reloads to next (U9)', async () => {
     mockFetch(okRoutes())
     const w = await mountSuspended(Login, { route: '/login?next=/settings' })
     await fillLogin(w)
     expect(useAuthStore().me?.username).toBe('kit')
-    expect(navigateToMock).toHaveBeenCalledWith('/settings')
+    expect(reloadMock).toHaveBeenCalledWith(expect.objectContaining({ path: '/settings', force: true }))
+    expect(navigateToMock).not.toHaveBeenCalled()
   })
 
   it('rejects open-redirect next=//evil.com', async () => {
     mockFetch(okRoutes())
     const w = await mountSuspended(Login, { route: '/login?next=//evil.com' })
     await fillLogin(w)
-    expect(navigateToMock).toHaveBeenCalledWith('/')
+    expect(reloadMock).toHaveBeenCalledWith(expect.objectContaining({ path: '/' }))
   })
 
   it('shows field errors from 422', async () => {
@@ -53,6 +56,7 @@ describe('login page', () => {
     expect(input.attributes('aria-invalid')).toBe('true')
     expect(w.get(`#${input.attributes('aria-describedby')!.split(' ')[0]}`).text()).toContain('do not match')
     expect(navigateToMock).not.toHaveBeenCalled()
+    expect(reloadMock).not.toHaveBeenCalled()
   })
 
   it('shows the throttle message on 429', async () => {
@@ -80,6 +84,7 @@ describe('register page', () => {
       username: 'kit', display_name: 'Kit', email: 'kit@example.com',
       password: 'secret-pass', password_confirmation: 'secret-pass',
     })
+    expect(reloadMock).toHaveBeenCalledWith(expect.objectContaining({ path: '/' }))
   })
 })
 

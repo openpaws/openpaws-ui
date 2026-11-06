@@ -8,7 +8,7 @@ const { pending, message, fieldError, run } = useFormError()
 function submit() {
   return run(async () => {
     await auth.register({ ...form })
-    await navigateTo('/')
+    reloadAfterAuthChange('/')
   })
 }
 </script>

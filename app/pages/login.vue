@@ -9,7 +9,7 @@ const { pending, message, fieldError, run } = useFormError()
 function submit() {
   return run(async () => {
     await auth.login({ ...form })
-    await navigateTo(safeNext(route.query.next))
+    reloadAfterAuthChange(safeNext(route.query.next))
   })
 }
 </script>

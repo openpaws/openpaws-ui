@@ -7,14 +7,16 @@ import ErrorPage from '~/error.vue'
 import { useAuthStore } from '~/stores/auth'
 import { json, ME, mockFetch } from '../helpers/mockFetch'
 
-const { navigateToMock } = vi.hoisted(() => ({ navigateToMock: vi.fn() }))
+const { navigateToMock, reloadMock } = vi.hoisted(() => ({ navigateToMock: vi.fn(), reloadMock: vi.fn() }))
 mockNuxtImport('navigateTo', () => navigateToMock)
+mockNuxtImport('reloadNuxtApp', () => reloadMock)
 
 const key = (w: { trigger: (e: string, o?: object) => Promise<unknown> }, k: string) => w.trigger('keydown', { key: k })
 
 describe('AppHeader', () => {
   beforeEach(() => {
     navigateToMock.mockReset()
+    reloadMock.mockReset()
     useAuthStore().me = null
   })
 
@@ -103,7 +105,25 @@ describe('AppHeader', () => {
     w.unmount()
   })
 
-  it('Log out navigates home even when the API fails', async () => {
+  it('Log out on / clears auth and fully reloads the app to / (U9)', async () => {
+    const f = mockFetch({ 'POST /auth/logout': () => json(null, 204) })
+    const auth = useAuthStore()
+    auth.me = ME as never
+    const w = await mountSuspended(AppHeader, { attachTo: document.body, route: '/' })
+    await w.get('[aria-haspopup="menu"]').trigger('click')
+    await w.findAll('[role="menuitem"]')[2]!.trigger('click')
+    await flushPromises()
+    expect(f.mock.calls.some(([u]) => u.endsWith('/auth/logout'))).toBe(true)
+    expect(auth.me).toBeNull()
+    expect(reloadMock).toHaveBeenCalledTimes(1)
+    expect(reloadMock).toHaveBeenCalledWith(expect.objectContaining({ path: '/', force: true }))
+    expect(reloadMock.mock.calls[0]![0].persistState).toBeFalsy()
+    expect(navigateToMock).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('Log out reloads home even when the API fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     mockFetch({ 'POST /auth/logout': () => json({ error: { code: 'server_error', message: 'boom' } }, 500) })
     const auth = useAuthStore()
     auth.me = ME as never
@@ -112,7 +132,7 @@ describe('AppHeader', () => {
     await w.findAll('[role="menuitem"]')[2]!.trigger('click')
     await flushPromises()
     expect(auth.me).toBeNull()
-    expect(navigateToMock).toHaveBeenCalledWith('/')
+    expect(reloadMock).toHaveBeenCalledWith(expect.objectContaining({ path: '/' }))
     w.unmount()
   })
 })

@@ -92,7 +92,8 @@ watch(() => route.fullPath, () => closeMenu())
 async function onLogout() {
   closeMenu()
   await auth.logout()
-  await navigateTo('/')
+  // Full reload (U9): no list, SSR payload or store state from the previous viewer survives.
+  reloadAfterAuthChange('/')
 }
 </script>
 
