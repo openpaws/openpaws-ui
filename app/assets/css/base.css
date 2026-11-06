@@ -42,3 +42,30 @@ a {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
+
+.auth-page {
+  max-width: 26rem;
+  margin-inline: auto;
+}
+.auth-page form {
+  display: grid;
+  gap: 1rem;
+}
+.auth-page .check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

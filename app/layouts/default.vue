@@ -9,6 +9,7 @@
         <small class="muted">OpenPaws &mdash; a public furry art gallery.</small>
       </div>
     </footer>
+    <Toasts />
   </div>
 </template>
 
