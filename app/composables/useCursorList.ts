@@ -15,18 +15,21 @@ export function useCursorList<T>(path: MaybeRefOrGetter<string>, query: Ref<Reco
   const error = ref<Error | null>(null)
   const extra = (opts.key ? useState<Record<string, unknown>>(`${opts.key}:extra`, () => ({})) : ref<Record<string, unknown>>({}))
   const cursorState = opts.key ? useState<string | null>(`${opts.key}:cursor`, () => null) : ref<string | null>(null)
-  let generation = 0
+  // Shared with the list state: any instance's reset() invalidates every in-flight request.
+  const epoch = opts.key ? useState<number>(`${opts.key}:epoch`, () => 0) : ref(0)
 
   async function loadMore() {
     if (loading.value || done.value) return
-    const gen = generation
+    const ep = epoch.value
+    const requested = toValue(path)
+    const stale = () => epoch.value !== ep || toValue(path) !== requested
     loading.value = true
     error.value = null
     try {
       const cursor = cursorState.value
       const q = cursor ? { ...query.value, cursor } : { ...query.value }
-      const res = await api<{ data: T[], meta: { next_cursor: string | null } } & Record<string, unknown>>(toValue(path), { query: q })
-      if (gen !== generation) return
+      const res = await api<{ data: T[], meta: { next_cursor: string | null } } & Record<string, unknown>>(requested, { query: q })
+      if (stale()) return
       if (cursor === null && items.value.length === 0) {
         const { data: _d, meta: _m, ...rest } = res
         extra.value = rest
@@ -36,15 +39,15 @@ export function useCursorList<T>(path: MaybeRefOrGetter<string>, query: Ref<Reco
       done.value = res.meta.next_cursor === null
     }
     catch (e) {
-      if (gen === generation) error.value = e as Error
+      if (!stale()) error.value = e as Error
     }
     finally {
-      if (gen === generation) loading.value = false
+      if (epoch.value === ep) loading.value = false
     }
   }
 
   function reset() {
-    generation++
+    epoch.value++
     items.value = []
     extra.value = {}
     cursorState.value = null

@@ -41,4 +41,20 @@ describe('useCursorList', () => {
     expect(list.error.value).toBeInstanceOf(Error)
     expect(list.loading.value).toBe(false)
   })
+
+  it('keyed: drops a response that resolves after a reset to another path', async () => {
+    let resolveA!: (v: unknown) => void
+    api.mockImplementationOnce(() => new Promise((r) => { resolveA = r }))
+      .mockResolvedValueOnce(page([20], null))
+    const path = ref('/tags/a')
+    const list = useCursorList<number>(path, ref({}), { key: 'race' })
+    const pendingA = list.loadMore()
+    path.value = '/tags/b'
+    list.reset()
+    await list.loadMore()
+    expect(list.items.value).toEqual([20])
+    resolveA(page([10], null))
+    await pendingA
+    expect(list.items.value).toEqual([20])
+  })
 })

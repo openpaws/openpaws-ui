@@ -96,8 +96,8 @@ describe('browse/search/tag pages', () => {
     await vi.waitFor(() => expect(w.text()).toContain('#fox'))
     await vi.waitFor(() => expect(w.text()).toContain('7'))
     expect(w.text()).not.toContain('#wolf')
-    expect(w.text()).toContain('T2')
-    expect(w.text()).toContain('T3')
+    // The harness may mount extra page instances sharing the keyed state, so assert on that state.
+    await vi.waitFor(() => expect(useNuxtApp().payload.state['$stag:items'].map((s: { id: string }) => s.id)).toEqual(['2', '3']))
     expect(w.text()).not.toContain('T1')
   })
 })
