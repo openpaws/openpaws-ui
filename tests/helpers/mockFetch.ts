@@ -5,7 +5,7 @@ export const json = (body: unknown, status = 200) =>
 
 export const ME = {
   id: 1, username: 'kit', display_name: 'Kit', email: 'kit@example.com', email_verified: true,
-  adult_confirmed: false, max_rating: 'sfw', role: 'user',
+  adult_confirmed: false, max_rating: 'general', role: 'user',
 }
 
 type Route = (url: string, init: RequestInit) => Response | Promise<Response>

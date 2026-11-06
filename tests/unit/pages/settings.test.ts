@@ -105,4 +105,35 @@ describe('settings page', () => {
     await flushPromises()
     expect(bodyOf(f, 'PATCH /me/profile')).toMatchObject({ bio: 'hi', species: 'wolf', links: [{ label: 'Site', url: 'https://a.example' }] })
   })
+
+  it('failed preload keeps Save disabled, sends no PATCH; Retry loads and enables', async () => {
+    let fail = true
+    const { w, f } = await mountPage({ ...ME }, {
+      'GET /users/kit': () => fail ? json({ error: { code: 'server', message: 'x' } }, 500) : json(PROFILE),
+      'PATCH /me/profile': () => json({ data: {} }),
+    })
+    expect(w.text()).toContain('Could not load your current profile.')
+    expect(w.get('button[type="submit"][disabled]').exists()).toBe(true)
+    expect(w.get('fieldset.bare').attributes('disabled')).toBeDefined()
+    await w.get('form[data-test="profile-form"]').trigger('submit')
+    await flushPromises()
+    expect(bodyOf(f, 'PATCH /me/profile')).toBeUndefined()
+    fail = false
+    await w.get('button[data-test="retry-profile"]').trigger('click')
+    await flushPromises()
+    expect((w.get('textarea[name="bio"]').element as HTMLTextAreaElement).value).toBe('hi')
+    expect(w.get('fieldset.bare').attributes('disabled')).toBeUndefined()
+    expect(w.text()).not.toContain('Could not load')
+  })
+
+  it('422 on max_rating resets the radio to the current rating', async () => {
+    const { w } = await mountPage({ ...ME, adult_confirmed: true, max_rating: 'general' }, {
+      'PATCH /me/settings': () => json({ error: { code: 'validation_failed', message: 'x', fields: { max_rating: ['Not allowed.'] } } }, 422),
+    })
+    await w.get('input[type="radio"][value="adult"]').setValue(true)
+    await w.get('form[data-test="rating-form"]').trigger('submit')
+    await flushPromises()
+    expect(w.text()).toContain('Not allowed.')
+    expect((w.get('input[type="radio"][value="general"]').element as HTMLInputElement).checked).toBe(true)
+  })
 })

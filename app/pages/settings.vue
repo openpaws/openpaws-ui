@@ -29,18 +29,25 @@ const maxRating = ref<Rating>(auth.me?.max_rating ?? 'general')
 const verified = computed(() => auth.me?.email_verified ?? false)
 const confirmed = computed(() => auth.me?.adult_confirmed ?? false)
 
-if (auth.me) {
+const profileLoaded = ref(false)
+const profileLoadError = ref('')
+
+async function loadProfile() {
+  if (!auth.me) return
+  profileLoadError.value = ''
   try {
     const res = await api<UserProfileResponse>(`/users/${encodeURIComponent(auth.me.username)}`)
     profileForm.bio = res.profile.bio ?? ''
     profileForm.species = res.profile.species ?? ''
     profileForm.pronouns = res.profile.pronouns ?? ''
     profileForm.links = (res.profile.links ?? []).map(l => ({ label: String(l.label ?? ''), url: String(l.url ?? '') }))
+    profileLoaded.value = true
   }
   catch {
-    prof.message.value = 'Could not load your current profile.'
+    profileLoadError.value = 'Could not load your current profile.'
   }
 }
+await loadProfile()
 
 function saveAccount() {
   return account.run(async () => {
@@ -67,6 +74,7 @@ function addLink() {
 }
 
 function saveProfile() {
+  if (!profileLoaded.value) return
   return prof.run(async () => {
     await api('/me/profile', {
       method: 'PATCH',
@@ -95,6 +103,8 @@ function saveRating() {
     const res = await api<{ data: Me }>('/me/settings', { method: 'PATCH', body: { max_rating: maxRating.value } })
     auth.me = res.data
     toasts.push('Content filter saved.')
+  }).then(() => {
+    if (rating.fields.value.max_rating && auth.me) maxRating.value = auth.me.max_rating
   })
 }
 
@@ -135,7 +145,14 @@ const ratings: { value: Rating, label: string }[] = [
 
     <form data-test="profile-form" novalidate @submit.prevent="saveProfile">
       <h2>Profile</h2>
+      <div v-if="profileLoadError" class="load-error" role="alert">
+        <p>{{ profileLoadError }}</p>
+        <button type="button" data-test="retry-profile" @click="loadProfile">
+          Retry
+        </button>
+      </div>
       <FormErrors :message="prof.message.value" />
+      <fieldset class="bare" :disabled="!profileLoaded">
       <div class="field">
         <label for="bio">Bio</label>
         <textarea id="bio" v-model="profileForm.bio" name="bio" rows="6" maxlength="20000" />
@@ -161,7 +178,8 @@ const ratings: { value: Rating, label: string }[] = [
           You can add up to {{ MAX_LINKS }} links.
         </p>
       </fieldset>
-      <button type="submit" :disabled="prof.pending.value">
+      </fieldset>
+      <button type="submit" :disabled="prof.pending.value || !profileLoaded">
         {{ prof.pending.value ? 'Saving…' : 'Save profile' }}
       </button>
     </form>
@@ -213,6 +231,7 @@ fieldset { min-width: 0; margin: 0; border: 1px solid var(--border); border-radi
 label { font-weight: 600; }
 .check { display: flex; gap: 0.5rem; align-items: center; font-weight: normal; }
 textarea { font: inherit; padding: 0.5rem 0.65rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 0.4rem; width: 100%; box-sizing: border-box; }
+.bare { border: 0; padding: 0; }
 .link-row { display: grid; gap: 0.5rem; min-width: 0; }
 .field__error { margin: 0; color: var(--danger); font-size: 0.9rem; }
 .hint { margin: 0; opacity: 0.8; }
