@@ -2,6 +2,7 @@
 import type { Single, Submission } from '~/types/api'
 
 const props = withDefaults(defineProps<{ id: string, interval?: number }>(), { interval: 3000 })
+const emit = defineEmits<{ retry: [id: string] }>()
 const api = useApi()
 const status = ref<'processing' | 'failed' | 'ready'>('processing')
 
@@ -29,7 +30,7 @@ usePoll(() => status.value === 'processing', async () => {
     <div v-else role="alert">
       <h2>Processing failed</h2>
       <p>This file could not be processed. Try again with the same or a different file.</p>
-      <NuxtLink :to="`/upload?retry=${id}`">
+      <NuxtLink :to="`/upload?retry=${id}`" @click="emit('retry', id)">
         Retry upload
       </NuxtLink>
     </div>

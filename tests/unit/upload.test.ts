@@ -192,6 +192,67 @@ describe('upload wizard', () => {
   })
 })
 
+describe('upload retry from the processing-failed step (I3)', () => {
+  beforeEach(() => {
+    navigateToMock.mockReset()
+    vi.unstubAllGlobals()
+    installFakeXhr()
+    // Earlier tests leave wizard instances mounted; their leave guards must not block these pushes.
+    vi.stubGlobal('confirm', () => true)
+    setMe()
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  const retryRoutes = () => ({
+    ...uploadRoutes(),
+    'GET /submissions/s9': () => json({ data: sub({ id: 's9', type: 'image', status: 'failed', title: 'Broken' }) }),
+    'POST /submissions/s9/retry': () => json({ data: sub({ id: 's9', status: 'processing' }) }),
+  })
+
+  it('/upload → /upload?retry=s9 in the same page instance enters retry mode on a fresh step', async () => {
+    const f = mockFetch({ ...retryRoutes(), 'GET /submissions/n1': () => json({ data: sub({ id: 'n1', status: 'failed' }) }) })
+    const w = await mountSuspended(UploadPage, { route: '/upload' })
+    await flushPromises()
+    await chooseType(w, 'image')
+    await pickFile(w, 'file', new File(['png'], 'a.png', { type: 'image/png' }))
+    await w.get('button[data-test="next"]').trigger('click')
+    await w.get('input[name="title"]').setValue('T')
+    await w.get('input[name="rating"][value="general"]').setValue(true)
+    await w.get('form').trigger('submit')
+    await vi.waitFor(() => expect(w.find('[data-test="processing"]').exists()).toBe(true))
+
+    await useRouter().push('/upload?retry=s9')
+    await flushPromises()
+    expect(w.find('[data-test="processing"]').exists()).toBe(false)
+    expect(w.get('h1').text()).toBe('Retry upload')
+    expect(w.text()).toContain('Broken')
+    expect(w.find('button[data-test="retry-submit"]').exists()).toBe(true)
+    expect(w.find('button[data-test="retry-submit"]').attributes('disabled')).toBeDefined()
+    await pickFile(w, 'file', new File(['png'], 'b.png', { type: 'image/png' }))
+    await w.get('button[data-test="retry-submit"]').trigger('click')
+    await vi.waitFor(() => expect(bodyOf(f, 'POST /submissions/s9/retry')).toEqual({ upload_session_id: 'u1' }))
+    await vi.waitFor(() => expect(w.find('[data-test="processing"]').exists()).toBe(true))
+    w.unmount()
+  })
+
+  it('Retry link to the URL already shown (/upload?retry=s9) resets to the file step', async () => {
+    mockFetch(retryRoutes())
+    await useRouter().push('/upload?retry=s9')
+    const w = await mountSuspended(UploadPage, { route: '/upload?retry=s9' })
+    await flushPromises()
+    await pickFile(w, 'file', new File(['png'], 'a.png', { type: 'image/png' }))
+    await w.get('button[data-test="retry-submit"]').trigger('click')
+    await vi.waitFor(() => expect(w.find('[data-test="processing"]').exists()).toBe(true))
+
+    w.findComponent(ProcessingStep).vm.$emit('retry', 's9')
+    await flushPromises()
+    expect(w.find('[data-test="processing"]').exists()).toBe(false)
+    expect(w.text()).toContain('Broken')
+    expect(w.get('button[data-test="retry-submit"]').attributes('disabled')).toBeDefined()
+    w.unmount()
+  })
+})
+
 describe('DetailsStep', () => {
   const form = () => ({ title: '', description: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public' })
 

@@ -24,14 +24,18 @@ function doResend() {
 }
 
 // ── Retry mode (/upload?retry={id}) ───────────────────────────────────────
-const retryId = typeof route.query.retry === 'string' ? route.query.retry : ''
+// Reactive to the query: /upload → /upload?retry=X keeps this page component mounted
+// (the processing-failed step links there), so the wizard resets and re-enters retry mode.
+const retryId = computed(() => (typeof route.query.retry === 'string' ? route.query.retry : ''))
 const retryTarget = ref<Submission | null>(null)
 const retryError = ref('')
 const type = ref<SubmissionType | null>(null)
+const folders = ref<Folder[]>([])
 
-if (verified.value && retryId) {
+async function loadRetry(id: string) {
   try {
-    const s = (await api<Single<Submission>>(`/submissions/${encodeURIComponent(retryId)}`)).data
+    const s = (await api<Single<Submission>>(`/submissions/${encodeURIComponent(id)}`)).data
+    if (id !== retryId.value) return
     if (s.user.username !== auth.me?.username) retryError.value = 'You can only retry your own submissions.'
     else if (s.status !== 'failed') retryError.value = 'This submission does not need a retry.'
     else {
@@ -40,12 +44,12 @@ if (verified.value && retryId) {
     }
   }
   catch {
-    retryError.value = 'Could not load that submission.'
+    if (id === retryId.value) retryError.value = 'Could not load that submission.'
   }
 }
 
-const folders = ref<Folder[]>([])
-if (verified.value && !retryId && auth.me) {
+async function loadFolders() {
+  if (!auth.me) return
   try {
     folders.value = (await api<{ data: Folder[] }>(`/users/${encodeURIComponent(auth.me.username)}/folders`)).data
   }
@@ -53,6 +57,13 @@ if (verified.value && !retryId && auth.me) {
     // Gallery and Scraps are always offered; custom folders are a bonus.
   }
 }
+
+/** Load what the current mode needs: the retry target, or the folders for a new upload. */
+function enterMode() {
+  if (!verified.value) return Promise.resolve()
+  return retryId.value ? loadRetry(retryId.value) : loadFolders()
+}
+await enterMode()
 
 // ── Uploads (start as soon as a file is picked) ───────────────────────────
 const uploaders: Record<Slot, Uploader> = { main: useUploader(), cover: useUploader() }
@@ -160,10 +171,31 @@ function publish() {
 
 function retrySubmit() {
   return withSessions(async (ids) => {
-    await api(`/submissions/${encodeURIComponent(retryId)}/retry`, { method: 'POST', body: ids })
-    submissionId.value = retryId
+    const id = retryId.value
+    await api(`/submissions/${encodeURIComponent(id)}/retry`, { method: 'POST', body: ids })
+    submissionId.value = id
     step.value = 3
   })
+}
+
+/** Back to a fresh step 1 (all uploads, form and errors dropped), then load the new mode. */
+function resetWizard() {
+  pick('main', null)
+  pick('cover', null)
+  step.value = 1
+  submissionId.value = ''
+  pub.clear()
+  Object.assign(form, { title: '', description: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public' })
+  retryTarget.value = null
+  retryError.value = ''
+  type.value = null
+  return enterMode()
+}
+watch(retryId, () => void resetWizard())
+
+/** "Retry upload" on the failed step: when it links to the URL we're already on, nothing navigates. */
+function onRetryLink(id: string) {
+  if (id === retryId.value) void resetWizard()
 }
 
 const publishStatus = computed(() => pub.pending.value && uploading.value ? 'Waiting for the upload to finish…' : '')
@@ -199,7 +231,7 @@ const publishStatus = computed(() => pub.pending.value && uploading.value ? 'Wai
           <span v-if="publishStatus" class="hint" role="status">{{ publishStatus }}</span>
         </div>
       </template>
-      <UploadProcessingStep v-else-if="step === 3" :id="submissionId" />
+      <UploadProcessingStep v-else-if="step === 3" :id="submissionId" @retry="onRetryLink" />
     </template>
 
     <template v-else>
@@ -236,7 +268,7 @@ const publishStatus = computed(() => pub.pending.value && uploading.value ? 'Wai
           </template>
         </UploadDetailsStep>
       </template>
-      <UploadProcessingStep v-else-if="step === 3" :id="submissionId" />
+      <UploadProcessingStep v-else-if="step === 3" :id="submissionId" @retry="onRetryLink" />
     </template>
   </section>
 </template>
