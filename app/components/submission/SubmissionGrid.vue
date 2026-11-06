@@ -24,7 +24,7 @@ onMounted(() => {
   hasObserver.value = typeof IntersectionObserver !== 'undefined'
   nextTick(attach)
 })
-watch(() => props.done, () => nextTick(attach))
+watch(() => [props.items.length, props.loading, props.done], () => nextTick(attach))
 onBeforeUnmount(() => observer?.disconnect())
 </script>
 

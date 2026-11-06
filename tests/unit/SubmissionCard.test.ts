@@ -77,8 +77,14 @@ describe('SubmissionCard', () => {
     expect(t.text()).toBe('x'.repeat(300))
     // styling contract lives in the component's scoped CSS
     const src = (await import('~/components/submission/SubmissionCard.vue?raw')).default as string
-    expect(src).toMatch(/overflow-wrap:\s*anywhere/)
-    expect(src).toMatch(/-webkit-line-clamp:\s*2/)
+    const block = (sel: string) => new RegExp(`${sel.replace('.', '\\.')}\\s*\\{([^}]*)\\}`).exec(src)?.[1] ?? ''
+    const title = block('.card-title')
+    expect(title).toMatch(/overflow-wrap:\s*anywhere/)
+    expect(title).toMatch(/-webkit-line-clamp:\s*2/)
+    expect(block('.card')).toMatch(/min-width:\s*0/)
+    expect(block('.card-body')).toMatch(/min-width:\s*0/)
+    const grid = (await import('~/components/submission/SubmissionGrid.vue?raw')).default as string
+    expect(/\.grid > li\s*\{([^}]*)\}/.exec(grid)?.[1]).toMatch(/min-width:\s*0/)
   })
 })
 
@@ -100,6 +106,28 @@ describe('SubmissionGrid', () => {
     cb([{ isIntersecting: true }])
     expect(w.emitted('more')).toHaveLength(1)
     expect(w.find('button').exists()).toBe(false)
+  })
+
+  it('re-arms the observer so more fires once loading ends while sentinel stays visible', async () => {
+    const instances: { disconnect: ReturnType<typeof vi.fn> }[] = []
+    class IO {
+      disconnect = vi.fn()
+      constructor(private c: (e: Partial<IntersectionObserverEntry>[]) => void) { instances.push(this) }
+      observe() { this.c([{ isIntersecting: true }]) }
+      unobserve() {}
+    }
+    vi.stubGlobal('IntersectionObserver', IO)
+    const w = await mountSuspended(SubmissionGrid, { props: { items: [make()], loading: true, done: false } })
+    await nextTick()
+    expect(w.emitted('more')).toBeUndefined()
+    await w.setProps({ loading: false })
+    await nextTick()
+    expect(w.emitted('more')).toHaveLength(1)
+    await w.setProps({ items: [make(), make({ id: 'z' })] })
+    await nextTick()
+    expect(w.emitted('more')).toHaveLength(2)
+    w.unmount()
+    expect(instances.at(-1)!.disconnect).toHaveBeenCalled()
   })
 
   it('shows empty state only when not loading and empty', async () => {
