@@ -25,7 +25,7 @@ watch(key, () => {
 
 const listNotFound = computed(() => list.error.value instanceof ApiError && list.error.value.status === 404)
 watch(listNotFound, (v) => {
-  if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found' }))
+  if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found', data: { requestId: (list.error.value as ApiError).requestId } }))
 }, { immediate: true })
 
 const current = computed(() => folders.value.find(f => f.kind === props.folder || f.id === props.folder))

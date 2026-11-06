@@ -17,7 +17,7 @@ watch(slug, () => {
 
 const notFound = computed(() => list.error.value instanceof ApiError && list.error.value.status === 404)
 watch(notFound, (v) => {
-  if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found' }))
+  if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found', data: { requestId: (list.error.value as ApiError).requestId } }))
 }, { immediate: true })
 const tag = computed(() => list.extra.value.tag as Tag | undefined)
 </script>

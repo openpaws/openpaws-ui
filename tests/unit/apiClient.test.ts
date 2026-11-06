@@ -92,6 +92,14 @@ describe('apiClient', () => {
     expect((await client('/x').catch(e => e)).fields).toEqual({})
   })
 
+  it('ApiError carries the X-Request-Id response header', async () => {
+    const { fetchMock, client } = setup()
+    fetchMock.mockImplementation(async () => json({ error: { code: 'server_error', message: 'x' } }, 500, { 'X-Request-Id': 'abc-1' }))
+    expect((await client('/x').catch(e => e)).requestId).toBe('abc-1')
+    fetchMock.mockImplementation(async () => json({ error: { code: 'server_error', message: 'x' } }, 500))
+    expect((await client('/x').catch(e => e)).requestId).toBeUndefined()
+  })
+
   it('network / non-JSON errors become status 0 network_error', async () => {
     const { fetchMock, client } = setup()
     fetchMock.mockRejectedValue(new TypeError('boom'))

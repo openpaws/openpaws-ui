@@ -147,7 +147,7 @@ export function createApiClient(deps: ApiClientDeps) {
 
     if (!res.ok) {
       if (res.status === 401 && !(method === 'GET' && path === '/me')) unauthenticatedHandler?.()
-      throw apiErrorFrom(res.status, parsed)
+      throw apiErrorFrom(res.status, parsed, res.headers.get('X-Request-Id') ?? undefined)
     }
     return parsed as T
   }

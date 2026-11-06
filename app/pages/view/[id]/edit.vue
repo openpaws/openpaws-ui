@@ -18,7 +18,7 @@ try {
 }
 catch (e) {
   const status = e instanceof ApiError ? e.status || 500 : 500
-  throw createError({ statusCode: status, statusMessage: status === 404 ? 'Not found' : 'Something went wrong', fatal: true })
+  throw createError({ statusCode: status, statusMessage: status === 404 ? 'Not found' : 'Something went wrong', data: { requestId: e instanceof ApiError ? e.requestId : undefined }, fatal: true })
 }
 
 const isOwner = !!auth.me && auth.me.username === submission.user.username

@@ -2,8 +2,12 @@ import type { Folder, Single, UserProfileResponse } from '~/types/api'
 import { ApiError } from '~/utils/apiError'
 
 // useAsyncData wraps thrown errors in a NuxtError whose `cause` is the original.
-const isNotFound = (e: unknown): boolean =>
-  e instanceof ApiError ? e.status === 404 : !!e && typeof e === 'object' && 'cause' in e && isNotFound((e as { cause: unknown }).cause)
+const rootCause = (e: unknown): unknown =>
+  e instanceof ApiError ? e : (e && typeof e === 'object' && 'cause' in e ? rootCause((e as { cause: unknown }).cause) : e)
+const isNotFound = (e: unknown): boolean => {
+  const c = rootCause(e)
+  return c instanceof ApiError && c.status === 404
+}
 
 /** Profile + folders for the `[username]` route param, following param changes. */
 export function useUserProfile() {
@@ -22,7 +26,7 @@ export function useUserProfile() {
 
   const notFound = computed(() => isNotFound(profile.error.value))
   watch(notFound, (v) => {
-    if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found' }))
+    if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found', data: { requestId: (rootCause(profile.error.value) as ApiError).requestId } }))
   }, { immediate: true })
 
   // Only expose data for the current param (the previous user's lingers while the next loads).

@@ -13,11 +13,16 @@ const { data: submission, error, refresh } = await useAsyncData<Submission | nul
   { watch: [id] },
 )
 
-if (error.value instanceof ApiError && error.value.status === 404) {
-  throw createError({ statusCode: 404, statusMessage: 'Not found', fatal: true })
+// useAsyncData may wrap the thrown ApiError in a NuxtError whose `cause` is the original.
+const apiErr = computed(() => {
+  const e = error.value as unknown
+  return e instanceof ApiError ? e : (e as { cause?: unknown } | null)?.cause instanceof ApiError ? (e as { cause: ApiError }).cause : null
+})
+if (apiErr.value?.status === 404) {
+  throw createError({ statusCode: 404, statusMessage: 'Not found', data: { requestId: apiErr.value.requestId }, fatal: true })
 }
 if (error.value) {
-  throw createError({ statusCode: error.value instanceof ApiError ? error.value.status || 500 : 500, statusMessage: 'Something went wrong', fatal: true })
+  throw createError({ statusCode: apiErr.value?.status || 500, statusMessage: 'Something went wrong', data: { requestId: apiErr.value?.requestId }, fatal: true })
 }
 if (submission.value) useSubmissionMeta(submission)
 
