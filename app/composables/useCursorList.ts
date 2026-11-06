@@ -6,14 +6,15 @@ import type { Ref } from 'vue'
  * of the first page (e.g. `tag` on GET /tags/{slug}) are exposed as `extra`.
  * Resets and reloads when `query` changes.
  */
-export function useCursorList<T>(path: string, query: Ref<Record<string, unknown>>) {
+export function useCursorList<T>(path: string, query: Ref<Record<string, unknown>>, opts: { key?: string } = {}) {
   const api = useApi()
-  const items = ref<T[]>([]) as Ref<T[]>
+  // With `key`, list state lives in Nuxt state so an SSR-loaded first page survives hydration.
+  const items = (opts.key ? useState<T[]>(`${opts.key}:items`, () => []) : ref<T[]>([])) as Ref<T[]>
   const loading = ref(false)
-  const done = ref(false)
+  const done = opts.key ? useState<boolean>(`${opts.key}:done`, () => false) : ref(false)
   const error = ref<Error | null>(null)
-  const extra = ref<Record<string, unknown>>({})
-  let cursor: string | null = null
+  const extra = (opts.key ? useState<Record<string, unknown>>(`${opts.key}:extra`, () => ({})) : ref<Record<string, unknown>>({}))
+  const cursorState = opts.key ? useState<string | null>(`${opts.key}:cursor`, () => null) : ref<string | null>(null)
   let generation = 0
 
   async function loadMore() {
@@ -22,6 +23,7 @@ export function useCursorList<T>(path: string, query: Ref<Record<string, unknown
     loading.value = true
     error.value = null
     try {
+      const cursor = cursorState.value
       const q = cursor ? { ...query.value, cursor } : { ...query.value }
       const res = await api<{ data: T[], meta: { next_cursor: string | null } } & Record<string, unknown>>(path, { query: q })
       if (gen !== generation) return
@@ -30,8 +32,8 @@ export function useCursorList<T>(path: string, query: Ref<Record<string, unknown
         extra.value = rest
       }
       items.value.push(...res.data)
-      cursor = res.meta.next_cursor
-      done.value = cursor === null
+      cursorState.value = res.meta.next_cursor
+      done.value = res.meta.next_cursor === null
     }
     catch (e) {
       if (gen === generation) error.value = e as Error
@@ -45,7 +47,7 @@ export function useCursorList<T>(path: string, query: Ref<Record<string, unknown
     generation++
     items.value = []
     extra.value = {}
-    cursor = null
+    cursorState.value = null
     done.value = false
     error.value = null
     loading.value = false
@@ -55,6 +57,9 @@ export function useCursorList<T>(path: string, query: Ref<Record<string, unknown
     reset()
     void loadMore()
   }, { deep: true })
+
+  // Keyed state outlives the page; on client navigation start fresh (hydration keeps the SSR page).
+  if (opts.key && import.meta.client && !useNuxtApp().isHydrating) reset()
 
   return { items, loading, done, error, extra, loadMore, reset }
 }
