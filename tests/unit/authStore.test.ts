@@ -68,6 +68,14 @@ describe('auth store', () => {
     expect(s.me).toBeNull()
   })
 
+  it('logout resolves and clears me even when the API call fails', async () => {
+    mockFetch({ 'POST /auth/logout': () => json({ error: { code: 'server_error', message: 'boom' } }, 500) })
+    const s = useAuthStore()
+    s.me = ME as never
+    await expect(s.logout()).resolves.toBeUndefined()
+    expect(s.me).toBeNull()
+  })
+
   it('401 from any call clears me and redirects to /login?next=current on auth routes', async () => {
     mockFetch({ 'GET /thing': () => json({ error: { code: 'unauthenticated', message: 'x' } }, 401) })
     const s = useAuthStore()

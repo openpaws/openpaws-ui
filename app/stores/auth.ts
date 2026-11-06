@@ -55,6 +55,9 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await useApi()('/auth/logout', { method: 'POST' })
     }
+    catch {
+      // Best effort: local state is cleared below regardless, so logout never strands the user.
+    }
     finally {
       me.value = null
     }
