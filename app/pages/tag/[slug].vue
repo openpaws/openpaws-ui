@@ -3,15 +3,22 @@ import type { Submission, Tag } from '~/types/api'
 import { ApiError } from '~/utils/apiError'
 
 const route = useRoute()
-const slug = String(route.params.slug)
-useHead({ title: `#${slug} — OpenPaws` })
+const slug = computed(() => String(route.params.slug))
+useHead(() => ({ title: `#${slug.value} — OpenPaws` }))
 
-const key = `tag:${slug}`
-const list = useCursorList<Submission>(`/tags/${encodeURIComponent(slug)}`, computed(() => ({})), { key })
+const list = useCursorList<Submission>(() => `/tags/${encodeURIComponent(slug.value)}`, computed(() => ({})), { key: 'tag' })
+// The state is keyed by page, not slug, so a reused component must reload when the slug changes.
+if (import.meta.client && !useNuxtApp().isHydrating) list.reset()
 if (!list.items.value.length && !list.done.value) await list.loadMore()
+watch(slug, () => {
+  list.reset()
+  void list.loadMore()
+})
 
 const notFound = computed(() => list.error.value instanceof ApiError && list.error.value.status === 404)
-if (notFound.value) showError(createError({ statusCode: 404, statusMessage: 'Not found' }))
+watch(notFound, (v) => {
+  if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found' }))
+}, { immediate: true })
 const tag = computed(() => list.extra.value.tag as Tag | undefined)
 </script>
 

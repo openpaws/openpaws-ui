@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Type / sort / period selectors; `modelValue` is the URL query. Period is only for popular sort.
-const props = defineProps<{ modelValue: Record<string, string>, sorts: { value: string, label: string }[], defaultSort: string }>()
+const props = defineProps<{ modelValue: Record<string, string>, sorts: { value: string, label: string }[], defaultSort: string, showPeriod?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [Record<string, string>] }>()
 
 const sort = computed(() => props.modelValue.sort || props.defaultSort)
@@ -30,7 +30,7 @@ const on = (key: string) => (e: Event) => set(key, (e.target as HTMLSelectElemen
         <option v-for="s in sorts" :key="s.value" :value="s.value">{{ s.label }}</option>
       </select>
     </label>
-    <label v-if="sort === 'popular'">Period
+    <label v-if="showPeriod && sort === 'popular'">Period
       <select name="period" :value="modelValue.period || 'week'" @change="on('period')($event)">
         <option value="day">Today</option>
         <option value="week">This week</option>

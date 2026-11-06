@@ -29,6 +29,7 @@ function update(next: Record<string, string>) {
     <SubmissionBrowseFilters
       :model-value="filters"
       default-sort="new"
+      show-period
       :sorts="[{ value: 'new', label: 'Newest' }, { value: 'popular', label: 'Popular' }]"
       @update:model-value="update"
     />

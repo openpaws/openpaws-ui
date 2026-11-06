@@ -42,8 +42,9 @@ function submit() {
   if (p.exclude_tags.length) next.exclude_tags = p.exclude_tags.slice(0, 20).join(',')
   return router.push({ path: '/search', query: next })
 }
+const omit = (q: Record<string, unknown>) => Object.fromEntries(Object.entries(q).filter(([k]) => !['type', 'sort', 'period'].includes(k)))
 function updateFilters(f: Record<string, string>) {
-  return router.push({ path: '/search', query: { ...route.query, ...{ type: undefined, sort: undefined }, ...f } })
+  return router.push({ path: '/search', query: { ...omit(route.query), ...f } })
 }
 
 // Tag autocomplete for the token being typed (#foo / -#foo).

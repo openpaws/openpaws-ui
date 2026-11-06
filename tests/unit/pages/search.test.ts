@@ -72,4 +72,32 @@ describe('browse/search/tag pages', () => {
     expect(w.find('ul.grid').exists()).toBe(false)
     clearError()
   })
+
+  it('search with popular sort has no period control or param', async () => {
+    mockFetch({ 'GET /search': () => page(['1']) })
+    const w = await mountSuspended(Search, { route: '/search?sort=popular' })
+    await flushPromises()
+    expect(w.find('select[name="period"]').exists()).toBe(false)
+    await w.get('select[name="type"]').setValue('image')
+    await vi.waitFor(() => expect(query().type).toBe('image'))
+    expect(query().sort).toBe('popular')
+    expect(query().period).toBeUndefined()
+  })
+
+  it('tag page follows slug changes within the same mounted page', async () => {
+    mockFetch({
+      'GET /tags/wolf': () => page(['1'], { tag: { slug: 'wolf', usage_count: 1 } }),
+      'GET /tags/fox': () => page(['2', '3'], { tag: { slug: 'fox', usage_count: 7 } }),
+    })
+    const w = await mountSuspended(Tag, { route: '/tag/wolf' })
+    await flushPromises()
+    expect(w.text()).toContain('#wolf')
+    await useRouter().push('/tag/fox')
+    await vi.waitFor(() => expect(w.text()).toContain('#fox'))
+    await vi.waitFor(() => expect(w.text()).toContain('7'))
+    expect(w.text()).not.toContain('#wolf')
+    expect(w.text()).toContain('T2')
+    expect(w.text()).toContain('T3')
+    expect(w.text()).not.toContain('T1')
+  })
 })

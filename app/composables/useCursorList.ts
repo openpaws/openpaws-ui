@@ -6,7 +6,7 @@ import type { Ref } from 'vue'
  * of the first page (e.g. `tag` on GET /tags/{slug}) are exposed as `extra`.
  * Resets and reloads when `query` changes.
  */
-export function useCursorList<T>(path: string, query: Ref<Record<string, unknown>>, opts: { key?: string } = {}) {
+export function useCursorList<T>(path: MaybeRefOrGetter<string>, query: Ref<Record<string, unknown>>, opts: { key?: string } = {}) {
   const api = useApi()
   // With `key`, list state lives in Nuxt state so an SSR-loaded first page survives hydration.
   const items = (opts.key ? useState<T[]>(`${opts.key}:items`, () => []) : ref<T[]>([])) as Ref<T[]>
@@ -25,7 +25,7 @@ export function useCursorList<T>(path: string, query: Ref<Record<string, unknown
     try {
       const cursor = cursorState.value
       const q = cursor ? { ...query.value, cursor } : { ...query.value }
-      const res = await api<{ data: T[], meta: { next_cursor: string | null } } & Record<string, unknown>>(path, { query: q })
+      const res = await api<{ data: T[], meta: { next_cursor: string | null } } & Record<string, unknown>>(toValue(path), { query: q })
       if (gen !== generation) return
       if (cursor === null && items.value.length === 0) {
         const { data: _d, meta: _m, ...rest } = res
