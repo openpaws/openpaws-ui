@@ -10,6 +10,18 @@ export const AUTH_FILE = path.resolve('tests/e2e/.auth/user.json')
 export const USER_FILE = path.resolve('tests/e2e/.auth/username.txt')
 export const TAG = 'e2etest'
 
+/** PHP guard prepended to every tinker snippet: never touch a non-local database. */
+export const LOCAL_ONLY_PHP = `if (! app()->environment('local', 'testing')) { throw new RuntimeException('e2e: refusing to run against APP_ENV=' . app()->environment()); }`
+
+/** Throws unless the API checkout the e2e run points at is a local/testing environment. */
+export function assertLocalApi() {
+  const out = execFileSync('php', ['artisan', 'env'], { cwd: API_DIR, encoding: 'utf8' })
+  const env = /\[([^\]]+)\]/.exec(out)?.[1]
+  if (env !== 'local' && env !== 'testing') {
+    throw new Error(`e2e: the API at ${API_DIR} is APP_ENV=${env ?? 'unknown'}; refusing to run (local/testing only)`)
+  }
+}
+
 let seq = 0
 /** Unique per run and per call; the e2e_ prefix is what global teardown cleans up. */
 export function uniqueUsername(): string {

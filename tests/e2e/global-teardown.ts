@@ -1,11 +1,22 @@
 import { execFileSync } from 'node:child_process'
-import { API_DIR } from './helpers'
+import { API_DIR, assertLocalApi, LOCAL_ONLY_PHP } from './helpers'
 
-/** Removes every e2e_ user together with their submissions (and their search-index entries). */
+/**
+ * Removes every e2e user (username e2e_*, email @example.test) together with their submissions
+ * (and their search-index entries). Local/testing API environments only.
+ */
 export default function globalTeardown() {
+  try {
+    assertLocalApi()
+  }
+  catch (e) {
+    console.warn('e2e cleanup skipped:', (e as Error).message)
+    return
+  }
   const code = `
+    ${LOCAL_ONLY_PHP}
     config(['scout.queue' => false]);
-    $users = App\\Models\\User::where('username', 'like', 'e2e\\\\_%')->get();
+    $users = App\\Models\\User::where('username', 'like', 'e2e\\\\_%')->where('email', 'like', '%@example.test')->get();
     foreach ($users as $u) {
       App\\Models\\Submission::withTrashed()->where('user_id', $u->id)->get()->each(function ($s) { $s->unsearchable(); $s->forceDelete(); });
       $u->delete();
