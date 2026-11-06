@@ -8,7 +8,7 @@ import ImageViewer from '~/components/submission/ImageViewer.vue'
 import WritingReader from '~/components/submission/WritingReader.vue'
 import AudioPlayer from '~/components/submission/AudioPlayer.vue'
 import VideoPlayer from '~/components/submission/VideoPlayer.vue'
-import ViewPage from '~/pages/view/[id].vue'
+import ViewPage from '~/pages/view/[id]/index.vue'
 import { json, ME, mockFetch } from '../helpers/mockFetch'
 import { sub } from '../helpers/submission'
 

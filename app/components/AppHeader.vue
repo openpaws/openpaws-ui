@@ -12,6 +12,7 @@ async function onLogout() {
       <NuxtLink to="/" class="app-header__logo">OpenPaws</NuxtLink>
       <nav class="app-header__nav" aria-label="Account">
         <template v-if="auth.me">
+          <NuxtLink to="/upload">Upload</NuxtLink>
           <span class="muted">{{ auth.me.display_name }}</span>
           <button type="button" @click="onLogout">Log out</button>
         </template>

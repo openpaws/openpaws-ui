@@ -137,3 +137,11 @@ describe('settings page', () => {
     expect((w.get('input[type="radio"][value="general"]').element as HTMLInputElement).checked).toBe(true)
   })
 })
+
+describe('settings avatar and banner', () => {
+  it('renders avatar and banner upload fields', async () => {
+    const { w } = await mountPage({ ...ME })
+    expect(w.find('input[type="file"][name="avatar"]').exists()).toBe(true)
+    expect(w.find('input[type="file"][name="banner"]').exists()).toBe(true)
+  })
+})

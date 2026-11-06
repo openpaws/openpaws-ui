@@ -31,6 +31,7 @@ const viewers = { image: resolveComponent('SubmissionImageViewer'), writing: res
 <template>
   <article v-if="submission" class="view-page">
     <SubmissionMeta :submission="submission" />
+    <NuxtLink v-if="isOwner" :to="`/view/${submission.id}/edit`" class="edit-link" data-testid="edit-link">Edit</NuxtLink>
     <section class="viewer" aria-label="Submission">
       <p v-if="submission.status === 'processing'" role="status" data-testid="status-processing">Processing…</p>
       <div v-else-if="submission.status === 'failed'" role="alert" data-testid="status-failed">
@@ -44,4 +45,5 @@ const viewers = { image: resolveComponent('SubmissionImageViewer'), writing: res
 
 <style scoped>
 .view-page { display: flex; flex-direction: column; gap: 1.5rem; }
+.edit-link { align-self: flex-start; }
 </style>

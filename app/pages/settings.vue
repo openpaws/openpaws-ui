@@ -184,7 +184,18 @@ const ratings: { value: Rating, label: string }[] = [
       </button>
     </form>
 
-    <!-- Avatar & banner section: added by Task 9 (useUploader). -->
+    <section aria-labelledby="images-h">
+      <h2 id="images-h">
+        Avatar and banner
+      </h2>
+      <p v-if="!verified" class="hint">
+        Verify your email to change your avatar or banner.
+      </p>
+      <template v-else>
+        <SettingsProfileImageField kind="avatar" />
+        <SettingsProfileImageField kind="banner" />
+      </template>
+    </section>
 
     <section aria-labelledby="adult-h">
       <h2 id="adult-h">
