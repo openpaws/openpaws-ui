@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Single, Submission } from '~/types/api'
-import { ApiError } from '~/utils/apiError'
+import { apiErrorOf } from '~/utils/apiError'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -13,11 +13,7 @@ const { data: submission, error, refresh } = await useAsyncData<Submission | nul
   { watch: [id] },
 )
 
-// useAsyncData may wrap the thrown ApiError in a NuxtError whose `cause` is the original.
-const apiErr = computed(() => {
-  const e = error.value as unknown
-  return e instanceof ApiError ? e : (e as { cause?: unknown } | null)?.cause instanceof ApiError ? (e as { cause: ApiError }).cause : null
-})
+const apiErr = computed(() => apiErrorOf(error.value))
 if (apiErr.value?.status === 404) {
   throw createError({ statusCode: 404, statusMessage: 'Not found', data: { requestId: apiErr.value.requestId }, fatal: true })
 }

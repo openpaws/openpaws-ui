@@ -1,13 +1,5 @@
 import type { Folder, Single, UserProfileResponse } from '~/types/api'
-import { ApiError } from '~/utils/apiError'
-
-// useAsyncData wraps thrown errors in a NuxtError whose `cause` is the original.
-const rootCause = (e: unknown): unknown =>
-  e instanceof ApiError ? e : (e && typeof e === 'object' && 'cause' in e ? rootCause((e as { cause: unknown }).cause) : e)
-const isNotFound = (e: unknown): boolean => {
-  const c = rootCause(e)
-  return c instanceof ApiError && c.status === 404
-}
+import { apiErrorOf, pageErrorFor } from '~/utils/apiError'
 
 /** Profile + folders for the `[username]` route param, following param changes. */
 export function useUserProfile() {
@@ -24,9 +16,12 @@ export function useUserProfile() {
     () => api<Single<Folder[]>>(`/users/${encodeURIComponent(username.value)}/folders`),
   )
 
-  const notFound = computed(() => isNotFound(profile.error.value))
-  watch(notFound, (v) => {
-    if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found', data: { requestId: (rootCause(profile.error.value) as ApiError).requestId } }))
+  const notFound = computed(() => apiErrorOf(profile.error.value)?.status === 404)
+  // Any failure of the profile or its folders is a page error: 404 → Not found, anything
+  // else (500, 429, network) → "Something went wrong" with the request id, never "Loading…" forever.
+  const failure = computed(() => profile.error.value ?? folders.error.value ?? null)
+  watch(failure, (e) => {
+    if (e) showError(createError(pageErrorFor(e)))
   }, { immediate: true })
 
   // Only expose data for the current param (the previous user's lingers while the next loads).

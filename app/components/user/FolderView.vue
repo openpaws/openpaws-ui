@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Submission } from '~/types/api'
-import { ApiError } from '~/utils/apiError'
+import { ApiError, pageErrorFor } from '~/utils/apiError'
 
 /** A user's folder listing: `folder` is 'gallery', 'scraps' or a custom folder's public id. */
 const props = defineProps<{ folder: string }>()
@@ -25,8 +25,13 @@ watch(key, () => {
 
 const listNotFound = computed(() => list.error.value instanceof ApiError && list.error.value.status === 404)
 watch(listNotFound, (v) => {
-  if (v) showError(createError({ statusCode: 404, statusMessage: 'Not found', data: { requestId: (list.error.value as ApiError).requestId } }))
+  if (v) showError(createError(pageErrorFor(list.error.value)))
 }, { immediate: true })
+
+function retryList() {
+  list.reset()
+  void list.loadMore()
+}
 
 const current = computed(() => folders.value.find(f => f.kind === props.folder || f.id === props.folder))
 const heading = computed(() => current.value?.name ?? (props.folder === 'scraps' ? 'Scraps' : props.folder === 'gallery' ? 'Gallery' : 'Folder'))
@@ -51,9 +56,10 @@ async function onChanged(info: { deleted?: string }) {
     <UserProfileHeader v-if="user" :user="user" :profile="profile" />
     <UserFolderNav :username="username" :folders="folders" />
     <h2>{{ heading }}</h2>
-    <p v-if="list.error.value" class="error" role="alert">
-      Could not load this folder.
-    </p>
+    <div v-if="list.error.value" class="error" role="alert">
+      <p>Something went wrong loading this folder.</p>
+      <button type="button" @click="retryList">Retry</button>
+    </div>
     <SubmissionGrid :items="items" :loading="list.loading.value" :done="list.done.value" @more="list.loadMore()" />
     <UserFolderManager
       v-if="isOwner && current"

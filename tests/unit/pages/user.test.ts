@@ -4,6 +4,7 @@ import { flushPromises } from '@vue/test-utils'
 import { useAuthStore } from '~/stores/auth'
 import Profile from '~/pages/user/[username]/index.vue'
 import Gallery from '~/pages/user/[username]/gallery.vue'
+import Scraps from '~/pages/user/[username]/scraps.vue'
 import FolderPage from '~/pages/user/[username]/folder/[id].vue'
 import { json, ME, mockFetch } from '../../helpers/mockFetch'
 import { sub } from '../../helpers/submission'
@@ -87,5 +88,60 @@ describe('user pages', () => {
     expect(w.text()).toContain('rex-art')
     expect(w.text()).toContain('REX')
     expect(w.text()).not.toContain('kit-art')
+  })
+
+  describe('non-404 failures (I2)', () => {
+    const boom = () => new Response(JSON.stringify({ error: { code: 'server_error', message: 'boom' } }), { status: 500, headers: { 'content-type': 'application/json', 'x-request-id': 'req-500' } })
+    beforeEach(() => clearError())
+
+    it.each([
+      ['profile', Profile, '/user/kit'],
+      ['gallery', Gallery, '/user/kit/gallery'],
+      ['scraps', Scraps, '/user/kit/scraps'],
+      ['folder', FolderPage, '/user/kit/folder/c1'],
+    ])('%s page: profile 500 shows "Something went wrong" with the request id', async (_n, page, route) => {
+      mockFetch({ ...routes('kit'), 'GET /users/kit': boom })
+      await mountSuspended(page as never, { route })
+      await flushPromises()
+      const err = useError().value as { statusCode: number, statusMessage: string, data?: { requestId?: string } }
+      expect(err).toBeTruthy()
+      expect(err.statusCode).toBe(500)
+      expect(err.statusMessage).toBe('Something went wrong')
+      expect(err.data?.requestId).toBe('req-500')
+    })
+
+    it('folders 500 is also a page error (no header-less page with empty nav)', async () => {
+      mockFetch({ ...routes('kit'), 'GET /users/kit/folders': boom })
+      await mountSuspended(Gallery, { route: '/user/kit/gallery' })
+      await flushPromises()
+      expect((useError().value as { statusCode: number } | undefined)?.statusCode).toBe(500)
+    })
+
+    it('a 429 maps to "Something went wrong", not Not found', async () => {
+      mockFetch({ ...routes('zed'), 'GET /users/zed': () => json({ error: { code: 'rate_limited', message: 'x' } }, 429) })
+      await mountSuspended(Profile, { route: '/user/zed' })
+      await flushPromises()
+      const err = useError().value as { statusCode: number, statusMessage: string }
+      expect(err.statusCode).toBe(429)
+      expect(err.statusMessage).toBe('Something went wrong')
+    })
+
+    it('folder list 500 shows an inline error with Retry that reloads', async () => {
+      let fail = true
+      mockFetch({
+        ...routes('kit'),
+        'GET /users/kit/submissions?folder=c1': () => (fail ? boom() : list(['kit-fox'])),
+      })
+      const w = await mountSuspended(FolderPage, { route: '/user/kit/folder/c1' })
+      await flushPromises()
+      expect(w.text()).toContain('KIT')
+      expect(w.get('[role="alert"]').text()).toContain('Something went wrong')
+      fail = false
+      await w.get('[role="alert"] button').trigger('click')
+      await flushPromises()
+      expect(w.find('[role="alert"]').exists()).toBe(false)
+      expect(w.text()).toContain('kit-fox')
+      expect(useError().value).toBeFalsy()
+    })
   })
 })
