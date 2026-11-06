@@ -24,6 +24,21 @@ export interface ApiClientDeps {
   isServer: boolean
   /** Cookie string: document.cookie on the client, the forwarded request header on the server. */
   getCookie: () => string
+  /** Server only: X-Forwarded-For to send, so the API's per-IP limits see the browser (U10). */
+  forwardedFor?: string
+}
+
+/**
+ * X-Forwarded-For for an SSR call, built like a proxy does: the incoming chain (if any) plus
+ * the address that connected to us. The API trusts it only from TRUSTED_PROXIES and walks it
+ * from the right, so a browser cannot spoof its IP by sending its own X-Forwarded-For.
+ */
+export function forwardedForChain(incoming: string | undefined | null, remoteAddress: string | undefined | null): string {
+  return [...(incoming ?? '').split(','), remoteAddress ?? '']
+    // Node reports IPv4 peers on dual-stack sockets as ::ffff:a.b.c.d; send plain IPv4.
+    .map(s => s.trim().replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1'))
+    .filter(Boolean)
+    .join(', ')
 }
 
 let unauthenticatedHandler: (() => void) | null = null
@@ -67,6 +82,7 @@ export function createApiClient(deps: ApiClientDeps) {
       if (cookie) h.cookie = cookie
       h.Origin = siteUrl
       h.Referer = `${siteUrl}/`
+      if (deps.forwardedFor) h['X-Forwarded-For'] = deps.forwardedFor
     }
     return h
   }

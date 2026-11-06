@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createApiClient, setUnauthenticatedHandler } from '~/utils/apiClient'
+import { createApiClient, forwardedForChain, setUnauthenticatedHandler } from '~/utils/apiClient'
 import { ApiError } from '~/utils/apiError'
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(status === 204 ? null : JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } })
 
-function setup(opts: { server?: boolean, cookie?: string } = {}) {
+function setup(opts: { server?: boolean, cookie?: string, forwardedFor?: string } = {}) {
   const jar = { value: opts.cookie ?? '' }
   const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>()
   const client = createApiClient({
@@ -14,6 +14,7 @@ function setup(opts: { server?: boolean, cookie?: string } = {}) {
     siteUrl: 'http://site.test',
     isServer: opts.server ?? false,
     getCookie: () => jar.value,
+    forwardedFor: opts.forwardedFor,
   })
   return { jar, fetchMock, client }
 }
@@ -80,6 +81,26 @@ describe('apiClient', () => {
     const [, post] = fetchMock.mock.calls[1]!
     expect(hdr(post, 'X-XSRF-TOKEN')).toBe('x y')
     expect(fetchMock).toHaveBeenCalledTimes(2) // no csrf fetch needed
+  })
+
+  it('SSR forwards the browser IP as X-Forwarded-For (U10); the browser client never sets it', async () => {
+    const ssr = setup({ server: true, forwardedFor: '203.0.113.7' })
+    ssr.fetchMock.mockImplementation(async () => json({ data: 1 }))
+    await ssr.client('/search')
+    expect(hdr(ssr.fetchMock.mock.calls[0]![1], 'X-Forwarded-For')).toBe('203.0.113.7')
+
+    const browser = setup({ forwardedFor: '203.0.113.7' })
+    browser.fetchMock.mockImplementation(async () => json({ data: 1 }))
+    await browser.client('/search')
+    expect(hdr(browser.fetchMock.mock.calls[0]![1], 'X-Forwarded-For')).toBeNull()
+  })
+
+  it('forwardedForChain appends the connecting address to any incoming chain', () => {
+    expect(forwardedForChain(undefined, '203.0.113.7')).toBe('203.0.113.7')
+    expect(forwardedForChain('1.2.3.4, 10.0.0.2', '127.0.0.1')).toBe('1.2.3.4, 10.0.0.2, 127.0.0.1')
+    expect(forwardedForChain(' , ', undefined)).toBe('')
+    expect(forwardedForChain(undefined, '::ffff:203.0.113.7')).toBe('203.0.113.7')
+    expect(forwardedForChain(undefined, '2001:db8::1')).toBe('2001:db8::1')
   })
 
   it('maps error shape to ApiError with fields', async () => {
