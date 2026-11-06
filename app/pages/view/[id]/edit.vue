@@ -36,6 +36,7 @@ if (isOwner && auth.me) {
 const initial: DetailsForm = {
   title: submission.title,
   description: submission.description ?? '',
+  alt_text: submission.alt_text ?? '',
   body: submission.body ?? '',
   rating: submission.rating,
   tags: [...submission.tags],
@@ -51,6 +52,7 @@ function changes(): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (form.title !== initial.title) out.title = form.title
   if (form.description !== initial.description) out.description = form.description.trim() ? form.description : null
+  if (submission.type === 'image' && form.alt_text !== initial.alt_text) out.alt_text = form.alt_text.trim() || null
   if (submission.type === 'writing' && form.body !== initial.body) out.body = form.body
   if (form.rating !== initial.rating) out.rating = form.rating
   if (form.tags.join(' ') !== initial.tags.join(' ')) out.tags = form.tags

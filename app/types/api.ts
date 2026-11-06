@@ -59,6 +59,8 @@ export interface Submission {
   title: string
   description: string | null
   description_html: string
+  /** Describes the image for screen readers (U11); fall back to the title when null. */
+  alt_text: string | null
   /** Only on GET /submissions/{id} for writing. */
   body?: string | null
   body_html?: string

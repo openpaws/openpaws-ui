@@ -26,7 +26,7 @@ const showBadge = computed(() => props.submission.rating !== 'general')
         :src="thumb.url"
         :srcset="srcset"
         sizes="(min-width: 1024px) 220px, (min-width: 480px) 33vw, 50vw"
-        :alt="submission.title"
+        :alt="submission.alt_text || submission.title"
         :width="thumb.width"
         :height="thumb.height"
         loading="lazy"

@@ -19,6 +19,16 @@ beforeEach(() => { useAuthStore().me = null; clearNuxtData() })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('viewers', () => {
+  it('image viewer: alt is alt_text || title and is part of the zoom button name (U11)', async () => {
+    const w = await mountSuspended(ImageViewer, { props: { submission: sub({ title: 'Fox', alt_text: 'A fox asleep in snow.' }) } })
+    expect(w.get('img').attributes('alt')).toBe('A fox asleep in snow.')
+    const btn = w.get('button[aria-pressed]')
+    expect(btn.attributes('aria-label')).toBeUndefined()
+    expect(btn.text()).toContain('(full size)')
+    const t = await mountSuspended(ImageViewer, { props: { submission: sub({ title: 'Fox', alt_text: null }) } })
+    expect(t.get('img').attributes('alt')).toBe('Fox')
+  })
+
   it('each type renders its viewer', async () => {
     const img = await mountSuspended(ImageViewer, { props: { submission: sub() } })
     expect(img.get('img').attributes('src')).toBe('https://cdn/p.jpg')

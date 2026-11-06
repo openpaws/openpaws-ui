@@ -130,7 +130,7 @@ const step = ref<1 | 2 | 3>(1)
 const submissionId = ref('')
 const pub = useFormError()
 const form = reactive<DetailsForm>({
-  title: '', description: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public',
+  title: '', description: '', alt_text: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public',
 })
 
 async function withSessions(send: (ids: Awaited<ReturnType<typeof sessionIds>>) => Promise<void>) {
@@ -157,6 +157,7 @@ function publish() {
         ...ids,
         title: form.title,
         ...(form.description.trim() ? { description: form.description } : {}),
+        ...(t === 'image' && form.alt_text.trim() ? { alt_text: form.alt_text.trim() } : {}),
         ...(t === 'writing' ? { body: form.body } : {}),
         rating: form.rating,
         tags: form.tags,
@@ -185,7 +186,7 @@ function resetWizard() {
   step.value = 1
   submissionId.value = ''
   pub.clear()
-  Object.assign(form, { title: '', description: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public' })
+  Object.assign(form, { title: '', description: '', alt_text: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public' })
   retryTarget.value = null
   retryError.value = ''
   type.value = null

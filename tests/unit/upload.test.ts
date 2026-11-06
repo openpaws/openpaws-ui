@@ -123,6 +123,34 @@ describe('upload wizard', () => {
     await w.get('form[data-test="details-form"]').trigger('submit')
     await flushPromises()
     expect(bodyOf(f, 'POST /submissions')).toMatchObject({ type: 'image', upload_session_id: 'u1', title: 'Fox', rating: 'general', folder: 'c1', visibility: 'unlisted' })
+    expect(bodyOf(f, 'POST /submissions')).not.toHaveProperty('alt_text')
+  })
+
+  it('image uploads offer an alt text field that is sent on publish (U11)', async () => {
+    const f = mockFetch(uploadRoutes())
+    const w = await mountSuspended(UploadPage, { route: '/upload' })
+    await chooseType(w, 'image')
+    await pickFile(w, 'file', new File(['png'], 'a.png', { type: 'image/png' }))
+    await w.get('button[data-test="next"]').trigger('click')
+    await flushPromises()
+    const alt = w.get('textarea[name="alt_text"]')
+    expect(w.get(`label[for="${alt.attributes('id')}"]`).text()).toBe('Alt text (describe the image)')
+    expect(w.get(`#${alt.attributes('aria-describedby')}`).text()).toBe('Helps people using screen readers.')
+    expect(alt.attributes('maxlength')).toBe('500')
+    await w.get('input[name="title"]').setValue('Fox')
+    await alt.setValue('  A fox asleep in snow. ')
+    await w.get('input[name="rating"][value="general"]').setValue(true)
+    await w.get('form[data-test="details-form"]').trigger('submit')
+    await vi.waitFor(() => expect(bodyOf(f, 'POST /submissions')).toMatchObject({ type: 'image', alt_text: 'A fox asleep in snow.' }))
+  })
+
+  it('non-image uploads have no alt text field', async () => {
+    mockFetch(uploadRoutes())
+    const w = await mountSuspended(UploadPage, { route: '/upload' })
+    await chooseType(w, 'writing')
+    await w.get('button[data-test="next"]').trigger('click')
+    await flushPromises()
+    expect(w.find('textarea[name="alt_text"]').exists()).toBe(false)
   })
 
   it('audio can add a cover; both sessions are sent', async () => {
@@ -254,7 +282,7 @@ describe('upload retry from the processing-failed step (I3)', () => {
 })
 
 describe('DetailsStep', () => {
-  const form = () => ({ title: '', description: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public' })
+  const form = () => ({ title: '', description: '', alt_text: '', body: '', rating: null, tags: [], folder: 'gallery', visibility: 'public' })
 
   it('mature and adult are disabled until 18+ is confirmed', async () => {
     const w = await mountSuspended(DetailsStep, { props: { modelValue: form(), type: 'image', adultConfirmed: false, folders: FOLDERS } })
@@ -335,6 +363,38 @@ describe('edit page', () => {
     await flushPromises()
     expect(bodyOf(f, 'PATCH /submissions/s1')).toEqual({ title: 'New', folder: 'scraps' })
     expect(navigateToMock).toHaveBeenCalledWith('/view/s1')
+  })
+
+  it('image edit shows alt text and PATCHes it (and null when cleared) (U11)', async () => {
+    const img = () => sub({ id: 's2', type: 'image', title: 'Pic', alt_text: 'Old alt', folders: [{ id: 'g1', name: 'Gallery', kind: 'gallery' }] })
+    const f = mockFetch({
+      'GET /submissions/s2': () => json({ data: img() }),
+      'GET /users/kit/folders': () => json({ data: FOLDERS }),
+      'PATCH /submissions/s2': () => json({ data: img() }),
+    })
+    const w = await mountSuspended(EditPage, { route: '/view/s2/edit' })
+    await flushPromises()
+    const alt = w.get('textarea[name="alt_text"]')
+    expect((alt.element as HTMLTextAreaElement).value).toBe('Old alt')
+    await alt.setValue('New alt')
+    await w.get('form[data-test="details-form"]').trigger('submit')
+    await flushPromises()
+    expect(bodyOf(f, 'PATCH /submissions/s2')).toEqual({ alt_text: 'New alt' })
+
+    f.mockClear()
+    const w2 = await mountSuspended(EditPage, { route: '/view/s2/edit' })
+    await flushPromises()
+    await w2.get('textarea[name="alt_text"]').setValue('  ')
+    await w2.get('form[data-test="details-form"]').trigger('submit')
+    await flushPromises()
+    expect(bodyOf(f, 'PATCH /submissions/s2')).toEqual({ alt_text: null })
+  })
+
+  it('writing edit has no alt text field', async () => {
+    mockFetch({ 'GET /submissions/s1': () => json({ data: owned() }), 'GET /users/kit/folders': () => json({ data: FOLDERS }) })
+    const w = await mountSuspended(EditPage, { route: '/view/s1/edit' })
+    await flushPromises()
+    expect(w.find('textarea[name="alt_text"]').exists()).toBe(false)
   })
 
   it('delete asks first, then deletes and goes to the gallery', async () => {

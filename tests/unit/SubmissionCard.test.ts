@@ -7,7 +7,7 @@ import type { Submission } from '~/types/api'
 
 function make(over: Partial<Submission> = {}): Submission {
   return {
-    id: 'abc123', type: 'image', title: 'A title', description: null, description_html: '',
+    id: 'abc123', type: 'image', title: 'A title', description: null, description_html: '', alt_text: null,
     rating: 'general', status: 'published', visibility: 'public', tags: [], views_count: 0,
     published_at: null, created_at: null,
     user: { username: 'fox', display_name: 'Fox Artist', avatar_url: null, banner_url: null, created_at: null },
@@ -36,6 +36,13 @@ describe('SubmissionCard', () => {
     expect(w.get('a').attributes('href')).toBe('/view/abc123')
     expect(w.findAll('a, button')).toHaveLength(1)
     expect(w.text()).toContain('Fox Artist')
+  })
+
+  it('uses alt_text as the image alt when set, else the title (U11)', async () => {
+    const w = await mountSuspended(SubmissionCard, { props: { submission: make({ alt_text: 'A fox asleep in snow.' }) } })
+    expect(w.get('img').attributes('alt')).toBe('A fox asleep in snow.')
+    const t = await mountSuspended(SubmissionCard, { props: { submission: make({ alt_text: null }) } })
+    expect(t.get('img').attributes('alt')).toBe('A title')
   })
 
   it('srcset only lists present sizes', async () => {

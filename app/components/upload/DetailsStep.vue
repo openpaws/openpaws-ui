@@ -4,6 +4,8 @@ import type { Folder, Rating, SubmissionType, Visibility } from '~/types/api'
 export interface DetailsForm {
   title: string
   description: string
+  /** Image submissions only (U11); empty = none. */
+  alt_text: string
   body: string
   rating: Rating | null
   tags: string[]
@@ -57,6 +59,24 @@ function onSubmit() {
       <textarea id="d-description" v-model="form.description" name="description" rows="4" maxlength="20000" />
       <p v-if="err('description')" class="field__error">
         {{ err('description') }}
+      </p>
+    </div>
+    <div v-if="type === 'image'" class="field">
+      <label for="d-alt">Alt text (describe the image)</label>
+      <textarea
+        id="d-alt"
+        v-model="form.alt_text"
+        name="alt_text"
+        rows="2"
+        maxlength="500"
+        aria-describedby="d-alt-hint"
+        :aria-invalid="err('alt_text') ? 'true' : undefined"
+      />
+      <p id="d-alt-hint" class="hint">
+        Helps people using screen readers.
+      </p>
+      <p v-if="err('alt_text')" class="field__error">
+        {{ err('alt_text') }}
       </p>
     </div>
     <div v-if="type === 'writing'" class="field">
